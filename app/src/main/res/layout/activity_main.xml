@@ -8,15 +8,17 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="300dp"
+        android:layout_height="400dp"
         android:orientation="vertical"
         android:layout_marginLeft="30dp"
         android:layout_marginRight="30dp"
         android:layout_gravity="center_vertical"
-        android:background="#ececec">
+        android:background="#cccccc">
         <com.yufeng.democalendar.WriteCalendar
             android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+            android:layout_height="match_parent"
+            android:paddingLeft="20dp"
+            android:paddingRight="20dp"/>
     </LinearLayout>
 
 </LinearLayout>

@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -24,7 +26,7 @@ public class WriteCalendar extends View {
 
     private static final String[] WEEKS = new String[]{"日", "一", "二", "三", "四", "五", "六"};
 
-
+    private static final int TITLE_TEXT_SIZE = 20;
     private static final int DAY_TEXT_SIZE = 18;
     private static final int WEEK_TEXT_SIZE = 17;
 
@@ -33,19 +35,21 @@ public class WriteCalendar extends View {
     private static final int DAY_CUR_TEXT_COLOR = Color.parseColor("#CD9B6B");
     private static final int DAY_NEX_TEXT_COLOR = Color.parseColor("#8D8E91");
 
+    private Paint titlePaint, titleArrowPaint;
     private Paint weekPaint;
     private Paint dayPrePaint, dayCurPaint, dayNexPaint;
 
-    private float totalWidth, oneWeekWidth, weekTextWidth, weekBaseLineY;
+    private float totalWidth, oneWeekWidth, weekTextWidth, weekBaseLineY, weekHeight;
 
-    private float oneHeight = 80;//每一行的高度
-    private int lineNum;//日期的行数
     private int lineSpaceHeight = 40;//日期行之间的间距
 
-    private float dayTextWidth;
-    private float dayDescent;
+    private float dayTextWidth, dayAscent, dayStartBaseLineY, dayTotalHeight, oneDayHeight;
+
+    private float titleWidth, titleBaseLineY, titleHeight;
+    private float arrowTopY, arrowBottomY, arrowMiddleY;
 
     private List<WriteDay> writeDayList;
+    private int curYear, curMonth, curDay;//当前日历里面的年，月
 
 
     public WriteCalendar(Context context) {
@@ -62,6 +66,17 @@ public class WriteCalendar extends View {
     }
 
     private void init(Context context) {
+        titlePaint = new Paint();
+        titlePaint.setAntiAlias(true);
+        titlePaint.setTextSize(sp2px(context, TITLE_TEXT_SIZE));
+        titlePaint.setColor(WEEK_TEXT_COLOR);
+
+        titleArrowPaint = new Paint();
+        titleArrowPaint.setAntiAlias(true);
+        titleArrowPaint.setColor(WEEK_TEXT_COLOR);
+        titleArrowPaint.setStyle(Paint.Style.FILL);
+        titleArrowPaint.setStrokeWidth(4f);
+
         weekPaint = new Paint();
         weekPaint.setAntiAlias(true);
         weekPaint.setTextSize(sp2px(context, WEEK_TEXT_SIZE));
@@ -83,6 +98,7 @@ public class WriteCalendar extends View {
         dayNexPaint.setColor(DAY_NEX_TEXT_COLOR);
 
         writeDayList = new ArrayList<>();
+        computeTitle();
         computeWeek();
         computeDay();
     }
@@ -91,16 +107,16 @@ public class WriteCalendar extends View {
         weekTextWidth = weekPaint.measureText(WEEKS[0]);
 
         Paint.FontMetrics fontMetrics = weekPaint.getFontMetrics();
-        weekBaseLineY = fontMetrics.descent + oneHeight;
+        weekBaseLineY += -fontMetrics.ascent;
+
+        weekHeight = fontMetrics.bottom - fontMetrics.top + lineSpaceHeight;
+
+        dayStartBaseLineY = weekBaseLineY + fontMetrics.descent + lineSpaceHeight;
     }
 
     private void computeDay() {
         Calendar calendar = Calendar.getInstance();
-        int currentDay = calendar.get(Calendar.DAY_OF_MONTH);//表示几号
-
-        int year = calendar.get(Calendar.YEAR);
-        int month = calendar.get(Calendar.MONTH);
-        calendar.set(year, month, 1);
+        calendar.set(curYear, curMonth, 1);
         int firstIndex = calendar.get(Calendar.DAY_OF_WEEK) - 1;
 
         int maxDayInMonth = calendar.getActualMaximum(Calendar.DAY_OF_MONTH);
@@ -112,11 +128,11 @@ public class WriteCalendar extends View {
 
             writeDay.setText(String.format(Locale.CANADA, "%02d", (i + 1)));
 
-            if (i < currentDay - 1) {
+            if (i < curDay - 1) {
                 writeDay.setDayStatus(WriteDay.Status.PRE);
-            } else if (i == currentDay - 1) {
+            } else if (i == curDay - 1) {
                 writeDay.setDayStatus(WriteDay.Status.CUR);
-            } else if (i > currentDay - 1) {
+            } else if (i > curDay - 1) {
                 writeDay.setDayStatus(WriteDay.Status.NEX);
             }
 
@@ -124,16 +140,51 @@ public class WriteCalendar extends View {
             writeDayList.add(writeDay);
         }
 
-        lineNum = writeDayList.get(writeDayList.size() - 1).getIndex() / 7 + 1;//计算行数
+        int lineNum = writeDayList.get(writeDayList.size() - 1).getIndex() / 7 + 1;//计算行数
 
         dayTextWidth = dayPrePaint.measureText("01");
-        dayDescent = dayPrePaint.getFontMetrics().descent;
+
+        Paint.FontMetrics fontMetrics = dayPrePaint.getFontMetrics();
+        dayAscent = -fontMetrics.ascent;
+
+        oneDayHeight = fontMetrics.bottom - fontMetrics.top;
+
+        dayTotalHeight = (fontMetrics.bottom - fontMetrics.top + lineSpaceHeight) * (lineNum + 1);//最后一行添加一行底部间距
+    }
+
+    private void computeTitle() {
+
+        Calendar calendar = Calendar.getInstance();
+        curDay = calendar.get(Calendar.DAY_OF_MONTH);//表示几号
+        curYear = calendar.get(Calendar.YEAR);
+        curMonth = calendar.get(Calendar.MONTH);
+
+        String title = curYear + "." + curMonth;
+        titleWidth = titlePaint.measureText(title);
+
+        Paint.FontMetrics fontMetrics = titlePaint.getFontMetrics();
+        titleBaseLineY = -fontMetrics.ascent + lineSpaceHeight;
+
+        titleHeight = fontMetrics.bottom - fontMetrics.top + lineSpaceHeight;
+
+        weekBaseLineY = titleBaseLineY + fontMetrics.descent + lineSpaceHeight;
+
+        Rect rect = new Rect();
+        titlePaint.getTextBounds(title, 0, 0 ,rect);
+//        arrowTopY = lineSpaceHeight + fontMetrics.ascent - fontMetrics.top;
+//        arrowBottomY = titleBaseLineY + fontMetrics.descent;
+//        arrowMiddleY = arrowTopY + (fontMetrics.descent - fontMetrics.ascent)/2 ;
+        arrowTopY = titleBaseLineY - rect.top;
+        arrowMiddleY = titleBaseLineY - rect.top + (rect.top + rect.bottom)/2;
+        arrowBottomY = titleBaseLineY + rect.bottom;
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
+        drawTitle(canvas);
         drawWeek(canvas);
         drawDay(canvas);
+        drawTestLine(canvas);
     }
 
     public static int sp2px(Context context, float spValue) {
@@ -141,18 +192,29 @@ public class WriteCalendar extends View {
         return (int) (spValue * fontScale + 0.5f);
     }
 
+    private void drawTitle(Canvas canvas) {
+        String title = curYear + "." + curMonth;
+        float startX = getPaddingLeft() + (totalWidth - titleWidth) / 2;
+        canvas.drawText(title, startX, titleBaseLineY, titlePaint);
+
+        canvas.drawLine(startX - 20, arrowTopY, startX - 60, arrowMiddleY, titleArrowPaint);
+        canvas.drawLine(startX- 60, arrowMiddleY, startX - 20, arrowBottomY, titleArrowPaint);
+    }
+
     private void drawWeek(Canvas canvas) {
         for (int i = 0; i < WEEKS.length; i++) {
             String week = WEEKS[i];
-            canvas.drawText(week, (oneWeekWidth - weekTextWidth) / 2 + (i * oneWeekWidth), weekBaseLineY, weekPaint);
+            canvas.drawText(week, getPaddingLeft() + (oneWeekWidth - weekTextWidth) / 2 + (i * oneWeekWidth), weekBaseLineY, weekPaint);
         }
     }
 
     private void drawDay(Canvas canvas) {
         for (int i = 0; i < writeDayList.size(); i++) {
             WriteDay writeDay = writeDayList.get(i);
-            float startX = (oneWeekWidth - dayTextWidth) / 2 + (writeDay.getIndex() % 7 * oneWeekWidth);
-            float baseLineY = oneHeight * 2 + lineSpaceHeight + (writeDay.getIndex() / 7) * (lineSpaceHeight + oneHeight) + dayDescent;
+            float startX = getPaddingLeft() + (oneWeekWidth - dayTextWidth) / 2 + (writeDay.getIndex() % 7 * oneWeekWidth);
+            float baseLineY = dayStartBaseLineY + (writeDay.getIndex() / 7) * (lineSpaceHeight + oneDayHeight) + dayAscent;
+
+            canvas.drawLine(getPaddingLeft(), baseLineY, totalWidth + getPaddingLeft(), baseLineY, titlePaint);
 
             if (writeDay.getDayStatus() == WriteDay.Status.PRE) {
                 canvas.drawText(writeDay.getText(), startX, baseLineY, dayPrePaint);
@@ -165,11 +227,18 @@ public class WriteCalendar extends View {
         }
     }
 
+    private void drawTestLine(Canvas canvas) {
+        canvas.drawLine(getPaddingLeft(), titleBaseLineY, totalWidth + getPaddingLeft(), titleBaseLineY, titlePaint);
+        canvas.drawLine(getPaddingLeft(), weekBaseLineY, totalWidth + getPaddingLeft(), weekBaseLineY, titlePaint);
+//        canvas.drawLine(0, dayStartBaseLineY, totalWidth, dayStartBaseLineY, titlePaint);
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        totalWidth = MeasureSpec.getSize(widthMeasureSpec);   //获取宽的尺寸
+        totalWidth = MeasureSpec.getSize(widthMeasureSpec) - getPaddingLeft() - getPaddingRight();   //获取宽的尺寸
         oneWeekWidth = totalWidth * 1.0f / WEEKS.length;
-        float height = oneHeight * 2 + lineNum * (oneHeight + lineSpaceHeight);
+//        float height = (oneHeight + lineSpaceHeight) * 2 + lineNum * (oneHeight + lineSpaceHeight);
+        float height = titleHeight + weekHeight + dayTotalHeight;
         setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), (int) height);
     }
 
