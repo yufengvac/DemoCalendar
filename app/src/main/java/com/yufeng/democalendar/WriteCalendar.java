@@ -5,10 +5,10 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -48,6 +48,7 @@ public class WriteCalendar extends View {
     private float oneModuleWidth;
 
     private int lineSpaceHeight = 50;//日期行之间的间距
+    private int radius = 45;
 
     private float dayTextWidth, dayTop, dayStartBaseLineY, dayTotalHeight, oneDayHeight;
 
@@ -64,6 +65,8 @@ public class WriteCalendar extends View {
     private int realCurYear, realCurMonth;//表示当前世界的年，月，不会发生改变
     private boolean canTurnNext = true;
 
+    private RectF updateRectF;
+
     private float titleStartX, titleEndX;//大标题2018.09的最左边坐标,最右边坐标
     private float leftArrowStartX, rightArrowEndX;//左箭头的最左边坐标,右箭头的最右边坐标
     private List<Float> dayBottomYList = new ArrayList<>();//每一个日期最底下的y坐标
@@ -78,10 +81,12 @@ public class WriteCalendar extends View {
 
     public WriteCalendar(Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
-        init(context);
+        init();
     }
 
-    private void init(Context context) {
+    private void init() {
+
+        updateRectF = new RectF();
 
         titlePaint = new Paint();
         titlePaint.setAntiAlias(true);
@@ -177,33 +182,35 @@ public class WriteCalendar extends View {
             writeDayList.add(writeDay);
         }
 
-        for (int i = 0; i < writeDayList.size(); i ++) {
+        writeDayList.get(5).setUpdate(true);
+
+        for (int i = 0; i < writeDayList.size(); i++) {
             WriteDay writeDay = writeDayList.get(i);
             if (!writeDay.isUpdate()) {
                 continue;
             }
 
-//            if (writeDay.getIndex() % 7 == 0) {//在最左边
             int step = 0;
-            while (i + 1 < writeDayList.size() && writeDayList.get(i + 1).isUpdate() && step < 7 - writeDay.getIndex() % 7) {
+            while (i + 1 + step < writeDayList.size() && writeDayList.get(i + 1 + step).isUpdate() && step < 7 - writeDay.getIndex() % 7 - 1) {
                 step++;
             }
             if (step == 0) {
                 writeDayList.get(i).setDayUpdateBgStyle(WriteDay.Style.SINGLE);
             } else {
-                for (int j = i; j < i + step; j++) {
+                for (int j = i; j < i + step +1; j++) {
                     if (j == i) {
                         writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.LEFT);
-                    } else if (j < i + step - 1) {
+                    } else if (j < i + step ) {
+//
                         writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.FULL);
-                    } else if (j == i + step - 1) {
+//
+                    } else if (j == i + step ) {
                         writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.RIGHT);
                         i = j;
                         break;
                     }
                 }
             }
-//            }
             Log.e("WriteCalendar", "writeDay=" + writeDay.toString());
         }
 
@@ -335,8 +342,9 @@ public class WriteCalendar extends View {
         arrowMargin = margin;
     }
 
-    private static float sp2px(Context context, float spValue) {
-        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, spValue, context.getResources().getDisplayMetrics());
+    @SuppressWarnings("unused")
+    public void setCircleRadius(int radius){
+        this.radius = radius;
     }
 
 
@@ -383,13 +391,37 @@ public class WriteCalendar extends View {
             if (writeDay.isUpdate()) {//画个有更新的背景
                 float cx = startX + dayTextWidth / 2;
                 float cy = titleHeight + lineSpaceHeight / 2 + weekHeight + (oneDayHeight + lineSpaceHeight) * row + (oneDayHeight + lineSpaceHeight) / 2;
-                canvas.drawCircle(cx, cy, 45, dayUpdateBgPaint);
+                if (writeDay.getDayUpdateBgStyle() == WriteDay.Style.SINGLE) {
+
+                    canvas.drawCircle(cx, cy, radius, dayUpdateBgPaint);
+
+                } else if (writeDay.getDayUpdateBgStyle() == WriteDay.Style.LEFT) {
+
+                    updateRectF.set((int) (cx - radius), (int) (cy - radius), (int) (cx + radius), (int) (cy + radius));
+
+                    canvas.drawArc(updateRectF, 90, 180, false, dayUpdateBgPaint);
+
+                    updateRectF.set((int) cx, (int) (cy - radius), (int) (cx + dayTextWidth / 2 + (oneModuleWidth - dayTextWidth) / 2), (int) (cy + radius));
+                    canvas.drawRect(updateRectF, dayUpdateBgPaint);
+
+                } else if (writeDay.getDayUpdateBgStyle() == WriteDay.Style.RIGHT) {
+
+                    updateRectF.set((int) (cx - radius), (int) (cy - radius), (int) (cx + radius), (int) (cy + radius));
+                    canvas.drawArc(updateRectF, 270, 180, false, dayUpdateBgPaint);
+
+                    updateRectF.set((int) (startX - (oneModuleWidth - dayTextWidth) / 2), (int) (cy - radius), (int) cx, (int) (cy + radius));
+                    canvas.drawRect(updateRectF, dayUpdateBgPaint);
+                } else if (writeDay.getDayUpdateBgStyle() == WriteDay.Style.FULL) {
+
+                    updateRectF.set((int) (cx - oneModuleWidth / 2), (int) (cy - radius), (int) (cx + oneModuleWidth / 2), (int) (cy + radius));
+                    canvas.drawRect(updateRectF, dayUpdateBgPaint);
+                }
             }
 
             if (writeDay.isSelected()) {//画个被选中的背景
                 float cx = startX + dayTextWidth / 2;
                 float cy = titleHeight + lineSpaceHeight / 2 + weekHeight + (oneDayHeight + lineSpaceHeight) * row + (oneDayHeight + lineSpaceHeight) / 2;
-                canvas.drawCircle(cx, cy, 45, daySelectBgPaint);
+                canvas.drawCircle(cx, cy, radius, daySelectBgPaint);
             }
 
             Paint textPaint = dayPrePaint;
@@ -412,13 +444,13 @@ public class WriteCalendar extends View {
 //        }
     }
 
-    private void drawTestLine(Canvas canvas) {
+//    private void drawTestLine(Canvas canvas) {
 //        canvas.drawLine(getPaddingLeft(), titleBaseLineY, totalWidth + getPaddingLeft(), titleBaseLineY, titlePaint);
 //        canvas.drawLine(getPaddingLeft(), weekBaseLineY, totalWidth + getPaddingLeft(), weekBaseLineY, titlePaint);
 
-        canvas.drawLine(getPaddingLeft(), titleHeight + lineSpaceHeight / 2, totalWidth + getPaddingLeft(), titleHeight + lineSpaceHeight / 2, dayCurPaint);
-        canvas.drawLine(getPaddingLeft(), titleHeight + lineSpaceHeight / 2 + weekHeight, totalWidth + getPaddingLeft(), titleHeight + lineSpaceHeight / 2 + weekHeight, dayCurPaint);
-    }
+//        canvas.drawLine(getPaddingLeft(), titleHeight + lineSpaceHeight / 2, totalWidth + getPaddingLeft(), titleHeight + lineSpaceHeight / 2, dayCurPaint);
+//        canvas.drawLine(getPaddingLeft(), titleHeight + lineSpaceHeight / 2 + weekHeight, totalWidth + getPaddingLeft(), titleHeight + lineSpaceHeight / 2 + weekHeight, dayCurPaint);
+//    }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
