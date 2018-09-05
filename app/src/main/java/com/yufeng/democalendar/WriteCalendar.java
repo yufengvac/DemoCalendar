@@ -37,11 +37,12 @@ public class WriteCalendar extends View {
     private static final int DAY_NEX_TEXT_COLOR = Color.parseColor("#8D8E91");
     private static final int ARROW_DISABLE_COLOR = Color.parseColor("#ECECEC");
     private static final int ARROW_ABLE_COLOR = Color.parseColor("#CD9B6B");
+    private static final int DAY_UPDATE_BG_COLOR = Color.parseColor("#F0DAC6");
 
     private Paint titlePaint, titleArrowPaint;
     private Paint weekPaint;
     private Paint dayPrePaint, dayCurPaint, dayNexPaint, daySelectPaint;
-    private Paint daySelectBgPaint;
+    private Paint daySelectBgPaint, dayUpdateBgPaint;
 
     private float totalWidth, weekTextWidth, weekBaseLineY, weekHeight;
     private float oneModuleWidth;
@@ -122,6 +123,10 @@ public class WriteCalendar extends View {
         daySelectPaint.setTextSize(DAY_TEXT_SIZE);
         daySelectPaint.setColor(Color.WHITE);
 
+        dayUpdateBgPaint = new Paint();
+        dayUpdateBgPaint.setAntiAlias(true);
+        dayUpdateBgPaint.setColor(DAY_UPDATE_BG_COLOR);
+
         writeDayList = new ArrayList<>();
         computeTitle();
         computeWeek();
@@ -167,8 +172,39 @@ public class WriteCalendar extends View {
                 writeDay.setDayStatus(WriteDay.Status.PRE);
             }
 
-            Log.e("WriteCalendar", "writeDay=" + writeDay.toString());
+            writeDay.setUpdate(i % 7 == 0 || (i + 1) % 7 == 0);
+
             writeDayList.add(writeDay);
+        }
+
+        for (int i = 0; i < writeDayList.size(); i ++) {
+            WriteDay writeDay = writeDayList.get(i);
+            if (!writeDay.isUpdate()) {
+                continue;
+            }
+
+//            if (writeDay.getIndex() % 7 == 0) {//在最左边
+            int step = 0;
+            while (i + 1 < writeDayList.size() && writeDayList.get(i + 1).isUpdate() && step < 7 - writeDay.getIndex() % 7) {
+                step++;
+            }
+            if (step == 0) {
+                writeDayList.get(i).setDayUpdateBgStyle(WriteDay.Style.SINGLE);
+            } else {
+                for (int j = i; j < i + step; j++) {
+                    if (j == i) {
+                        writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.LEFT);
+                    } else if (j < i + step - 1) {
+                        writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.FULL);
+                    } else if (j == i + step - 1) {
+                        writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.RIGHT);
+                        i = j;
+                        break;
+                    }
+                }
+            }
+//            }
+            Log.e("WriteCalendar", "writeDay=" + writeDay.toString());
         }
 
         int lineNum = writeDayList.get(writeDayList.size() - 1).getIndex() / 7 + 1;//计算行数
@@ -344,6 +380,12 @@ public class WriteCalendar extends View {
             float startX = getPaddingLeft() + (oneModuleWidth - dayTextWidth) / 2 + (writeDay.getIndex() % 7 * oneModuleWidth);
             float baseLineY = dayStartBaseLineY + row * (lineSpaceHeight + oneDayHeight) + dayTop;
 
+            if (writeDay.isUpdate()) {//画个有更新的背景
+                float cx = startX + dayTextWidth / 2;
+                float cy = titleHeight + lineSpaceHeight / 2 + weekHeight + (oneDayHeight + lineSpaceHeight) * row + (oneDayHeight + lineSpaceHeight) / 2;
+                canvas.drawCircle(cx, cy, 45, dayUpdateBgPaint);
+            }
+
             if (writeDay.isSelected()) {//画个被选中的背景
                 float cx = startX + dayTextWidth / 2;
                 float cy = titleHeight + lineSpaceHeight / 2 + weekHeight + (oneDayHeight + lineSpaceHeight) * row + (oneDayHeight + lineSpaceHeight) / 2;
@@ -361,7 +403,6 @@ public class WriteCalendar extends View {
             if (writeDay.isSelected()) {
                 textPaint = daySelectPaint;
             }
-
             canvas.drawText(writeDay.getText(), startX, baseLineY, textPaint);
         }
 
