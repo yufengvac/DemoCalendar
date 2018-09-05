@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/colorAccent"
     tools:context="com.yufeng.democalendar.MainActivity">
 
     <LinearLayout
@@ -12,13 +13,12 @@
         android:orientation="vertical"
         android:layout_marginLeft="30dp"
         android:layout_marginRight="30dp"
-        android:layout_gravity="center_vertical"
-        android:background="#cccccc">
+        android:background="@color/colorPrimary"
+        android:layout_gravity="center_vertical">
         <com.yufeng.democalendar.WriteCalendar
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingLeft="20dp"
-            android:paddingRight="20dp"/>
+            android:background="#F9F8F8"/>
     </LinearLayout>
 
 </LinearLayout>
