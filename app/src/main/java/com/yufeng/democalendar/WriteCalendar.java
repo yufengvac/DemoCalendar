@@ -277,8 +277,14 @@ public class WriteCalendar extends View {
      * @param column column列
      */
     private void updateWriteDay(int row, int column) {
+        if (writeDayList == null || writeDayList.size() == 0){
+            return;
+        }
         int index = row * 7 + column;
         WriteDay selectedDay = null;
+        if (index < writeDayList.get(0).getIndex() || index > writeDayList.get(writeDayList.size()-1).getIndex()){
+            return;
+        }
         for (WriteDay writeDay : writeDayList) {
             if (writeDay.getIndex() == index) {
                 writeDay.setSelected(true);
@@ -494,7 +500,7 @@ public class WriteCalendar extends View {
             } else if (x > titleEndX && x <= rightArrowEndX + 50) {//点击了右箭头
                 turnNextMonth();
             }
-        } else if (y >= titleHeight + lineSpaceHeight / 2 + weekHeight) {//日期第一行高度
+        } else if (y >= titleHeight + lineSpaceHeight / 2 + weekHeight && y < titleHeight + weekHeight + dayTotalHeight - lineSpaceHeight - oneDayHeight) {//日期第一行高度
             int row = 0;
             for (int i = 0; i < dayBottomYList.size(); i++) {
                 if (y <= dayBottomYList.get(i)) {
