@@ -16,6 +16,7 @@
         android:background="@color/colorPrimary"
         android:layout_gravity="center_vertical">
         <com.yufeng.democalendar.WriteCalendar
+            android:id="@+id/write_calendar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#F9F8F8"/>

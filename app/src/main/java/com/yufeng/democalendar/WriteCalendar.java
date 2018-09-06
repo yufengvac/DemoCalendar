@@ -8,7 +8,6 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -70,6 +69,9 @@ public class WriteCalendar extends View {
     private float titleStartX, titleEndX;//大标题2018.09的最左边坐标,最右边坐标
     private float leftArrowStartX, rightArrowEndX;//左箭头的最左边坐标,右箭头的最右边坐标
     private List<Float> dayBottomYList = new ArrayList<>();//每一个日期最底下的y坐标
+
+    private OnDateChangeListener onDateChangeListener;
+    private OnDaySelectedListener onDaySelectedListener;
 
     public WriteCalendar(Context context) {
         this(context, null);
@@ -138,6 +140,43 @@ public class WriteCalendar extends View {
         computeDay();
     }
 
+    private void computeTitle() {
+
+
+        Calendar calendar = Calendar.getInstance();
+
+        curDay = calendar.get(Calendar.DAY_OF_MONTH);//表示几号
+        curYear = calendar.get(Calendar.YEAR);
+        curMonth = calendar.get(Calendar.MONTH) + 1;//少1
+
+        realCurYear = curYear;
+        realCurMonth = curMonth;
+
+        canTurnNext = false;
+
+
+        String title = curYear + "." + String.format(Locale.CANADA, "%02d", curMonth);
+        titleWidth = titlePaint.measureText(title);
+
+        Rect rect = new Rect();
+        titlePaint.getTextBounds(title, 0, title.length(), rect);
+
+        Paint.FontMetrics fontMetrics = titlePaint.getFontMetrics();
+        titleBaseLineY = -fontMetrics.top + lineSpaceHeight;
+
+        titleHeight = fontMetrics.bottom - fontMetrics.top + lineSpaceHeight;
+
+        weekBaseLineY = titleBaseLineY + fontMetrics.bottom + lineSpaceHeight;
+
+        arrowTopY = titleBaseLineY + rect.top + 7;
+        arrowMiddleY = titleBaseLineY + rect.top + (rect.bottom - rect.top) / 2;
+        arrowBottomY = titleBaseLineY + rect.bottom - 7;
+
+        arrowOffsetX = (float) Math.sqrt((arrowMiddleY - arrowTopY) * (arrowBottomY - arrowMiddleY));//画三角的左右顶点偏移量，可保证三角是直角
+        arrowCompensate = (float) Math.sqrt(arrowStrokeWidth);
+
+    }
+
     private void computeWeek() {
         weekTextWidth = weekPaint.measureText(WEEKS[0]);
 
@@ -197,21 +236,20 @@ public class WriteCalendar extends View {
             if (step == 0) {
                 writeDayList.get(i).setDayUpdateBgStyle(WriteDay.Style.SINGLE);
             } else {
-                for (int j = i; j < i + step +1; j++) {
+                for (int j = i; j < i + step + 1; j++) {
                     if (j == i) {
                         writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.LEFT);
-                    } else if (j < i + step ) {
-//
+                    } else if (j < i + step) {
+
                         writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.FULL);
-//
-                    } else if (j == i + step ) {
+
+                    } else if (j == i + step) {
                         writeDayList.get(j).setDayUpdateBgStyle(WriteDay.Style.RIGHT);
                         i = j;
                         break;
                     }
                 }
             }
-            Log.e("WriteCalendar", "writeDay=" + writeDay.toString());
         }
 
         int lineNum = writeDayList.get(writeDayList.size() - 1).getIndex() / 7 + 1;//计算行数
@@ -231,42 +269,6 @@ public class WriteCalendar extends View {
         }
     }
 
-    private void computeTitle() {
-
-        if (curYear == 0 || curMonth == 0) {
-            Calendar calendar = Calendar.getInstance();
-
-            curDay = calendar.get(Calendar.DAY_OF_MONTH);//表示几号
-            curYear = calendar.get(Calendar.YEAR);
-            curMonth = calendar.get(Calendar.MONTH) + 1;//少1
-
-            realCurYear = curYear;
-            realCurMonth = curMonth;
-
-            canTurnNext = false;
-        }
-
-        String title = curYear + "." + String.format(Locale.CANADA, "%02d", curMonth);
-        titleWidth = titlePaint.measureText(title);
-
-        Rect rect = new Rect();
-        titlePaint.getTextBounds(title, 0, title.length(), rect);
-
-        Paint.FontMetrics fontMetrics = titlePaint.getFontMetrics();
-        titleBaseLineY = -fontMetrics.top + lineSpaceHeight;
-
-        titleHeight = fontMetrics.bottom - fontMetrics.top + lineSpaceHeight;
-
-        weekBaseLineY = titleBaseLineY + fontMetrics.bottom + lineSpaceHeight;
-
-        arrowTopY = titleBaseLineY + rect.top + 7;
-        arrowMiddleY = titleBaseLineY + rect.top + (rect.bottom - rect.top) / 2;
-        arrowBottomY = titleBaseLineY + rect.bottom - 7;
-
-        arrowOffsetX = (float) Math.sqrt((arrowMiddleY - arrowTopY) * (arrowBottomY - arrowMiddleY));//画三角的左右顶点偏移量，可保证三角是直角
-        arrowCompensate = (float) Math.sqrt(arrowStrokeWidth);
-
-    }
 
     /**
      * 表示点击的是第row行第index个日期，需要更新一下模型
@@ -276,16 +278,24 @@ public class WriteCalendar extends View {
      */
     private void updateWriteDay(int row, int column) {
         int index = row * 7 + column;
+        WriteDay selectedDay = null;
         for (WriteDay writeDay : writeDayList) {
             if (writeDay.getIndex() == index) {
                 writeDay.setSelected(true);
+                selectedDay = writeDay;
             } else {
                 writeDay.setSelected(false);
             }
         }
         invalidate();
+        if (onDaySelectedListener != null && selectedDay != null) {
+            onDaySelectedListener.onDaySelected(curYear, curMonth, Integer.valueOf(selectedDay.getText()));
+        }
     }
 
+    /**
+     * 翻到上一个月，点击title左边箭头
+     */
     private void turnPreMonth() {
 
         if (curMonth == 1) {
@@ -304,8 +314,15 @@ public class WriteCalendar extends View {
         }
         computeDay();
         invalidate();
+
+        if (onDateChangeListener != null) {
+            onDateChangeListener.onDateChange(curYear, curMonth);
+        }
     }
 
+    /**
+     * 翻到下一个月，点击title右边箭头
+     */
     private void turnNextMonth() {
         if (!canTurnNext) {
             return;
@@ -327,6 +344,10 @@ public class WriteCalendar extends View {
         }
         computeDay();
         invalidate();
+
+        if (onDateChangeListener != null) {
+            onDateChangeListener.onDateChange(curYear, curMonth);
+        }
     }
 
     @Override
@@ -336,17 +357,6 @@ public class WriteCalendar extends View {
         drawDay(canvas);
 //        drawTestLine(canvas);
     }
-
-    @SuppressWarnings("unused")
-    public void setArrowMargin(int margin) {
-        arrowMargin = margin;
-    }
-
-    @SuppressWarnings("unused")
-    public void setCircleRadius(int radius){
-        this.radius = radius;
-    }
-
 
     private void drawTitle(Canvas canvas) {
         String title = curYear + "." + String.format(Locale.CANADA, "%02d", curMonth);
@@ -360,8 +370,6 @@ public class WriteCalendar extends View {
 
         if (!canTurnNext) {
             titleArrowPaint.setColor(ARROW_DISABLE_COLOR);
-        } else {
-            titleArrowPaint.setColor(ARROW_ABLE_COLOR);
         }
         canvas.drawLine(startX1 + arrowMargin, arrowTopY, (int) (startX1 + arrowMargin + arrowOffsetX + arrowCompensate), (int) (arrowMiddleY + arrowCompensate), titleArrowPaint);
         canvas.drawLine(startX1 + arrowMargin + arrowOffsetX, arrowMiddleY, startX1 + arrowMargin, arrowBottomY, titleArrowPaint);
@@ -388,7 +396,7 @@ public class WriteCalendar extends View {
             float startX = getPaddingLeft() + (oneModuleWidth - dayTextWidth) / 2 + (writeDay.getIndex() % 7 * oneModuleWidth);
             float baseLineY = dayStartBaseLineY + row * (lineSpaceHeight + oneDayHeight) + dayTop;
 
-            if (writeDay.isUpdate()) {//画个有更新的背景
+            if (writeDay.isUpdate()) {//画有更新的背景
                 float cx = startX + dayTextWidth / 2;
                 float cy = titleHeight + lineSpaceHeight / 2 + weekHeight + (oneDayHeight + lineSpaceHeight) * row + (oneDayHeight + lineSpaceHeight) / 2;
                 if (writeDay.getDayUpdateBgStyle() == WriteDay.Style.SINGLE) {
@@ -418,7 +426,7 @@ public class WriteCalendar extends View {
                 }
             }
 
-            if (writeDay.isSelected()) {//画个被选中的背景
+            if (writeDay.isSelected()) {//画被选中的背景
                 float cx = startX + dayTextWidth / 2;
                 float cy = titleHeight + lineSpaceHeight / 2 + weekHeight + (oneDayHeight + lineSpaceHeight) * row + (oneDayHeight + lineSpaceHeight) / 2;
                 canvas.drawCircle(cx, cy, radius, daySelectBgPaint);
@@ -497,5 +505,41 @@ public class WriteCalendar extends View {
             int xIndex = (int) (x / oneModuleWidth);
             updateWriteDay(row, xIndex);
         }
+    }
+
+    /**********************暴露给外面的方法*************************/
+
+    @SuppressWarnings("unused")
+    public void setArrowMargin(int margin) {
+        arrowMargin = margin;
+    }
+
+    @SuppressWarnings("unused")
+    public void setCircleRadius(int radius) {
+        this.radius = radius;
+    }
+
+    public int getCurYear(){
+        return curYear;
+    }
+
+    public int getCurMonth(){
+        return curMonth;
+    }
+
+    public void setOnDateChangeListener(OnDateChangeListener listener) {
+        this.onDateChangeListener = listener;
+    }
+
+    public void setOnDaySelectedListener(OnDaySelectedListener listener) {
+        this.onDaySelectedListener = listener;
+    }
+
+    public interface OnDateChangeListener {
+        void onDateChange(int year, int month);
+    }
+
+    public interface OnDaySelectedListener {
+        void onDaySelected(int year, int month, int day);
     }
 }
